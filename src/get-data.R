@@ -3,6 +3,9 @@ library(readxl)
 library(fpp3)
 library(readabs)
 
+countries <- read_excel("country_assoc.xlsx") %>% mutate(AreaCode = areacode) %>% select(AreaCode,AreaName)
+
+
 data2014_12 <- read_excel("2014_12_ActualTotalLoad.xlsx")
 data2014 <- data2014_12
 
@@ -76,6 +79,16 @@ data2019_11 <- read_excel("2019_11_ActualTotalLoad.xlsx")
 data2019_12 <- read_excel("2019_12_ActualTotalLoad.xlsx")
 data2019 <- bind_rows(data2019_1,data2019_2,data2019_3,data2019_4,data2019_5,data2019_6,data2019_7,data2019_8,data2019_9,data2019_10,data2019_11,data2019_12)
 
+data1 <- bind_rows(data2014,data2015,data2016,data2017,data2018,data2019)
+data1$Date <- as.Date(data1$DateTime)
+data1$Time <- format(data1$DateTime, "%H:%M:%S")
+data1$Hours <- format(as.POSIXct(data1$DateTime, "%Y-%m-%d %H:%M:%S", tz = ""), format = "%H")
+data1$Minutes <- format(as.POSIXct(data1$DateTime, "%Y-%m-%d %H:%M:%S", tz = ""), format = "%M")
+data1$Day <- format(as.POSIXct(data1$DateTime, "%Y-%m-%d %H:%M:%S", tz = ""), format = "%d")
+data1$Year <- format(as.POSIXct(data1$DateTime, "%Y-%m-%d %H:%M:%S", tz = ""), format = "%Y")
+data1$Month <- format(as.POSIXct(data1$DateTime, "%Y-%m-%d %H:%M:%S", tz = ""), format = "%m")
+data1 <- data1 %>% mutate(AreaCode = areacode) %>% select(DateTime, Year, Month, Day, Hours, Minutes, AreaName, AreaCode, AreaTypeCode, ResolutionCode, TotalLoadValue)
+
 #data2020_1 <- read_excel("2020_1_ActualTotalLoad.xlsx")
 #data2020_2 <- read_excel("2020_2_ActualTotalLoad.xlsx")
 #data2020_3 <- read_excel("2020_3_ActualTotalLoad.xlsx")
@@ -98,6 +111,7 @@ data2020_11 <- read_excel("2020_11_ActualTotalLoad_6.1.A.xlsx")
 data2020_12 <- read_excel("2020_12_ActualTotalLoad_6.1.A.xlsx")
 data2020 <- bind_rows(data2020_01,data2020_02,data2020_03,data2020_04,data2020_05,data2020_06,data2020_07,data2020_08,data2020_09,data2020_10,data2020_11,data2020_12)
 
+
 data2021_01 <- read_excel("2021_01_ActualTotalLoad_6.1.A.xlsx")
 data2021_02 <- read_excel("2021_02_ActualTotalLoad_6.1.A.xlsx")
 data2021_03 <- read_excel("2021_03_ActualTotalLoad_6.1.A.xlsx")
@@ -106,11 +120,16 @@ data2021_05 <- read_excel("2021_05_ActualTotalLoad_6.1.A.xlsx")
 data2021_06 <- read_excel("2021_06_ActualTotalLoad_6.1.A.xlsx")
 data2021 <- bind_rows(data2021_01,data2021_02,data2021_03,data2021_04,data2021_05,data2021_06)
 
+data2 <- bind_rows(data2020,data2021)
+data2$Date <- as.Date(data2$DateTime)
+data2$Time <- format(data2$DateTime, "%H:%M:%S")
+data2$Hours <- format(as.POSIXct(data2$DateTime, "%Y-%m-%d %H:%M:%S", tz = ""), format = "%H")
+data2$Minutes <- format(as.POSIXct(data2$DateTime, "%Y-%m-%d %H:%M:%S", tz = ""), format = "%M")
+data2$Day <- format(as.POSIXct(data2$DateTime, "%Y-%m-%d %H:%M:%S", tz = ""), format = "%d")
+data2$Year <- format(as.POSIXct(data2$DateTime, "%Y-%m-%d %H:%M:%S", tz = ""), format = "%Y")
+data2$Month <- format(as.POSIXct(data2$DateTime, "%Y-%m-%d %H:%M:%S", tz = ""), format = "%m")
+data2 <- data2 %>% select(DateTime, Year, Month, Day, Hours, Minutes, AreaName, AreaCode, AreaTypeCode, ResolutionCode, TotalLoadValue)
 
-all_data <- bind_rows(data2014,data2015,data2016,data2017,data2018,data2019,data2020,data2021)
 
-filtered_all_data <- all_data %>% filter(AreaTypeCode == "CTY")
-
-filtered_all_data <- filtered_all_data$Date <- as.Date(filtered_all_data$DateTime)
-filtered_all_data <- filtered_all_data$Time <- format(filtered_all_data$DateTime, "%H:%M:%S")
-filtered_all_data <- filtered_all_data$Hours <- format(as.POSIXct(filtered_all_data$DateTime, "%Y-%m-%d %H:%M:%S", tz = ""), format = "%H")
+all_data <- bind_rows(data1,data2)
+filtered_all_data <- all_data %>% filter(AreaTypeCode == "CTY") %>% inner_join(countries, by="AreaCode") %>% mutate(AreaName = AreaName.y, Month = as.numeric(Month), Day = as.numeric(Day), Hours = as.numeric(Hours), Minutes = as.numeric(Minutes), Year = as.numeric(Year)) %>% select(DateTime, Year, Month, Day, Hours, Minutes, AreaName, ResolutionCode, TotalLoadValue)
