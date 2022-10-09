@@ -3,6 +3,8 @@ library(readxl)
 library(fpp3)
 library(readabs)
 
+# setwd("C://Users//Ayden//OneDrive - Monash University//Uni//2022 S2//ETC3555//electricity_models_3555//data//raw")
+
 countries <- read_excel("country_assoc.xlsx") %>% mutate(AreaCode = areacode) %>% select(AreaCode,AreaName)
 
 
@@ -132,4 +134,16 @@ data2 <- data2 %>% select(DateTime, Year, Month, Day, Hours, Minutes, AreaName, 
 
 
 all_data <- bind_rows(data1,data2)
-filtered_all_data <- all_data %>% filter(AreaTypeCode == "CTY") %>% inner_join(countries, by="AreaCode") %>% mutate(AreaName = AreaName.y, Month = as.numeric(Month), Day = as.numeric(Day), Hours = as.numeric(Hours), Minutes = as.numeric(Minutes), Year = as.numeric(Year)) %>% select(DateTime, Year, Month, Day, Hours, Minutes, AreaName, ResolutionCode, TotalLoadValue)
+
+filtered_all_data <- all_data %>% 
+  filter(AreaTypeCode == "CTY") %>% 
+  inner_join(countries, by="AreaCode") %>% 
+  mutate(
+    AreaName = AreaName.y, 
+    Month = as.numeric(Month), 
+    Day = as.numeric(Day), 
+    Hours = as.numeric(Hours), 
+    Minutes = as.numeric(Minutes), 
+    Year = as.numeric(Year)) %>% 
+  select(DateTime, Year, Month, Day, Hours, 
+         Minutes, AreaName, ResolutionCode, TotalLoadValue)

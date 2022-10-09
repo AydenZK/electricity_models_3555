@@ -1,0 +1,129 @@
+---
+title: "train_dhr"
+author: "Ayden Zein Khalil 30604265"
+date: '2022-10-06'
+output: html_document
+---
+
+```{r}
+source("../src/get-data.R")
+```
+
+```{r}
+getwd()
+```
+
+```{r}
+library(fpp3)
+library(dplyr)
+library(glue)
+```
+
+```{r}
+as.POSIXct(glue('2014-1-1 7:00'), tz="")
+
+filtered_all_data %>% 
+  mutate(newdate = as.POSIXct(glue('{Year}-{Month}-{Day} {Hours}:00'), tz="")) %>%
+  select(newdate)
+
+filtered_all_data %>% 
+  mutate(Country=AreaName) %>%
+  group_by(Year, Month, Day, Hours, Country) %>%
+  summarise(TotalLoadValue = sum(TotalLoadValue), .groups="drop") %>%
+  mutate(Date = as.POSIXct(glue('{Year}-{Month}-{Day} {Hours}:00'), tz=""))
+
+
+data <- filtered_all_data %>% 
+  mutate(Date=date(DateTime), Country=AreaName) %>%
+  group_by(Date, Country) %>%
+  summarise(TotalLoadValue = sum(TotalLoadValue), .groups="drop") %>%
+  as_tsibble(index="Date", key="Country")
+
+``` 
+
+
+```{r}
+elec_austria <- data %>% filter(Country=="Austria") %>% select(Date, TotalLoadValue)
+elec_belgium <- data %>% filter(Country=="Belgium") %>% select(Date, TotalLoadValue)
+elec_spain <- data %>% filter(Country=="Spain") %>% select(Date, TotalLoadValue)
+elec_croatia <- data %>% filter(Country=="Croatia") %>% select(Date, TotalLoadValue)
+elec_italy <- data %>% filter(Country=="Italy") %>% select(Date, TotalLoadValue)
+```
+
+
+```{r}
+elec_austria_fit <- elec_austria %>%
+  model(
+    dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
+                stepwise=FALSE,
+                order_constraint = (p+q <= 8 & P+Q <= 5))
+  )
+
+accuracy(elec_austria_fit)
+
+autoplot(elec_austria)
+
+forecast(elec_austria_fit, h = 730) %>% autoplot(elec_austria %>% filter(Date >= "2017-06-01"))
+```
+
+```{r}
+elec_belgium_fit <- elec_belgium %>% fill_gaps() %>%
+  model(
+    dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
+                stepwise=FALSE,
+                order_constraint = (p+q <= 8 & P+Q <= 5))
+  )
+
+accuracy(elec_belgium_fit)
+
+autoplot(elec_belgium)
+
+forecast(elec_belgium_fit, h = 730) %>% autoplot(elec_belgium %>% filter(Date >= "2017-06-01"))
+```
+
+```{r}
+elec_spain_fit <- elec_spain %>% fill_gaps() %>%
+  model(
+    dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
+                stepwise=FALSE,
+                order_constraint = (p+q <= 8 & P+Q <= 5))
+  )
+
+accuracy(elec_spain_fit)
+
+autoplot(elec_spain)
+
+forecast(elec_spain_fit, h = 730) %>% autoplot(elec_spain %>% filter(Date >= "2017-06-01"))
+```
+
+
+```{r}
+elec_croatia_fit <- elec_croatia %>% fill_gaps() %>%
+  model(
+    dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
+                stepwise=FALSE,
+                order_constraint = (p+q <= 8 & P+Q <= 5))
+  )
+
+accuracy(elec_croatia_fit)
+
+autoplot(elec_croatia)
+
+forecast(elec_croatia_fit, h = 730) %>% autoplot(elec_croatia %>% filter(Date >= "2017-06-01"))
+```
+
+
+```{r}
+elec_italy_fit <- elec_italy %>% fill_gaps() %>%
+  model(
+    dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
+                stepwise=FALSE,
+                order_constraint = (p+q <= 8 & P+Q <= 5))
+  )
+
+accuracy(elec_italy_fit)
+
+autoplot(elec_italy)
+
+forecast(elec_italy_fit, h = 730) %>% autoplot(elec_italy %>% filter(Date >= "2017-06-01"))
+```
