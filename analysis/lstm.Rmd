@@ -1,0 +1,279 @@
+---
+title: "ETC3555 Group Project"
+author: "Group 4 - Colin"
+date: "2022-10-11"
+output:
+  pdf_document: default
+  html_document: default
+---
+# ETC3555 Group Project
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE
+  )
+
+```
+
+```{r}
+# Importing Libraries
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(tidymodels)
+library(keras)
+
+# File directory
+library(here)
+
+# Library for forecasting (ARIMA model)
+library(fpp3)
+```
+
+# Getting the Data
+Actual total load columns:
+- Year, Month, Day, DateTime, ResolutionCode, areacode, AreaTypeCode, AreaName, MapCode, TotalLoadValue, UpdateTime
+- name areacode (replaced with AreaCode) and Year, Month, Day not present for .A files (Including 2020_01_ActualTotalLoad_6.1.A)
+
+```{r}
+source("get-data.R", local=knitr::knit_global())
+```
+
+```{r}
+elec_data <- filtered_all_data
+```
+
+# Neural Network
+## Aggregating load data
+```{r}
+elec_data <- filtered_all_data %>%
+  transmute(
+    ResolutionCode,
+    AreaName, 
+    load=TotalLoadValue,
+    Time = as.POSIXct(DateTime),
+    Date = as_date(Time)
+  ) %>%
+  as_tsibble(index=Time, key=c(ResolutionCode, AreaName))
+
+
+new_data <- elec_data %>%
+  filter(AreaName == "Austria") 
+
+new_data$Date <- as.Date(new_data$Date)
+
+new_data <- aggregate(new_data["load"], by=new_data["Date"],sum)
+
+# Data from 2014-12-01 to 2021-06-02
+```
+
+# Types of forecasting
+
+- Short-term load forecasting (minutes to weeks)
+- Medium-term load forecasting (weeks to months)
+- Long-term load forecasting (years to decades)
+
+Data from a city --> Hourly load data, 75:25 training split 
+Day-ahead: 1 day prior, 24 hour average load
+
+# Load forecasting - Area, time, date (seasonality, day of week, hour of day, holidays, etc.) 
+# Data focuses on the time
+# Other factors include demographic (population, income level), weather (temp, wind speed, humidity, etc.), pricing
+
+# Prepare data
+# Must be (samples, timesteps, input_dim)
+# samples: batch_size, timesteps: number of time steps for an observation, features: no. of features
+# Lag series to have value at t-datalags and value at t as output
+
+## Preprocessing the data
+```{r}
+# Preprocessing (Scaling and normalising data)
+load_data <- data.matrix(new_data[,-1])
+
+mean <- apply(load_data, 2, mean)
+std <- apply(load_data, 2, sd)
+load_data <- scale(load_data, center = mean, scale = std)
+
+# Normalise data for the range of sigmoid function in LSTM
+normalise <- function(x){
+  return((x-min(x))/ (max(x)-min(x)))
+}
+
+orig_max <- apply(load_data, 2, max)
+orig_min <- apply(load_data, 2, min)
+
+load_data <- apply(load_data, 2, normalise)
+
+```
+
+```{r}
+# Create data split
+n_split <- round(nrow(load_data) * 0.8, 0)
+train_set <- load_data[1:n_split, ]
+test_set <- load_data[(n_split+1):(nrow(load_data)), ]
+```
+
+```{r}
+# Create x and y
+format_xy <- function(data_set, datalags=7, datafuture=1){
+  # Datalags: How many days in the past to used to predict
+  # Datafuture: How many days in the future we want to predict
+  n <- length(data_set)
+  lf_df <- data.frame() # Lags, future df
+  
+  for(i in 1:n){
+    # New row that has data from i to (datalags+datafuture) days after i
+    lf_df <- rbind(lf_df, t(data_set[i:(i + datalags + datafuture - 1)]))
+  }
+  
+  x_data <- as.matrix(lf_df[,1:datalags]) # Assigns datalag number of columns as inputs
+  y_data <- as.matrix(lf_df[,-(1:datalags)]) # Assigns datafuture number of columns as output labels
+  
+  dim(x_data) <- c(n, datalags, 1) # Reshaping the data for lstm (samples, timesteps, features)
+  
+  return(list("x" = x_data, "y" = y_data))
+}
+```
+
+```{r}
+# Get x, y for training and testing data
+datalags <- 1
+datafuture <- 1
+train_out <- format_xy(train_set, datalags=datalags, datafuture=datafuture)
+x_train <- train_out$x
+y_train <- train_out$y
+
+test_out <- format_xy(test_set, datalags=datalags, datafuture=datafuture)
+x_test <- test_out$x
+y_test <- test_out$y
+```
+
+## Model Architecture
+### LSTM 
+- Long-term dependencies using 'memory'
+- Forget gate layer, input gate, memory cell, output gate
+```{r}
+model <- keras_model_sequential() %>%
+  layer_lstm(units = 128, input_shape = c(dim(x_train)[2], dim(x_train)[3])) %>%
+  layer_dense(units = 256, activation="relu") %>%
+  layer_dropout(0.3) %>%
+  layer_dense(units = 128, activation="relu") %>%
+  layer_dropout(0.3) %>%
+  layer_dense(units = 64, activation="relu") %>%
+  layer_dropout(0.3) %>%
+  layer_dense(units = 8, activation="relu") %>%
+  layer_dense(units = datafuture, activation="relu")
+
+# For regression the dense layer will have a single node with a linear activation
+# LSTM will use a sigmoid activation function for recurrent connections and tanh for output activation function
+summary(model)
+```
+
+```{r}
+set.seed(4)
+model %>% compile(loss = "mean_squared_error", optimizer = optimizer_adam(learning_rate=0.001, decay=1e-6), metrics = c('mae','mse'))
+
+# Fitting network
+#callbacks <- c(callback_early_stopping(monitor='val_loss', min_delta=0.01, patience=5, verbose=0, mode='auto'))
+
+history <- model %>% fit(
+  x_train,
+  y_train,
+  batch_size = 128,
+  epochs = 10,
+  validation_split = 0.2,
+  use_multiprocessing = T
+)
+
+plot(history)
+
+model %>%
+  save_model_hdf5("lstm_model_1.h5")
+
+```
+
+## Training the model
+Training:
+- Learning rate
+- Early stopping 
+- Learning rate scheduler
+- Batch size
+- Weight decay (or normalisation)
+- Drop out
+- Data augmentation
+
+## Model evaluation
+https://web.archive.org/web/20200527141027/https://keras.rstudio.com/articles/tutorial_overfit_underfit.html
+OVERFITTING AND UNDERFITTING
+
+# Hyperparameters
+# Tuning number of hidden units, momentum, increasing LSTM hidden units (200)
+# Learning rate ANN 0.01, LSTM 0.005
+# Performance metrics 
+# MAPE, RMSE, SSE, R
+
+
+```{r}
+# Predicting data
+pred_out <- model %>% predict(x_test, batch_size = 1)
+```
+
+```{r}
+# Loading model
+#new_model <- load_model_hdf5("lstm_model_1.h5")
+#pred_out <- new_model %>% predict(x_test, batch_size = 1)
+```
+
+
+## Plotting normalised outputs from neural network
+```{r}
+check <- as.data.frame(cbind(y_test, pred_out))
+X1 <- seq(1, length(y_test)*3,3)
+p <- ggplot(check, aes(x=X1, y=V1)) + geom_point(colour="black", size=0.3, alpha=0.8) +
+  geom_point(aes(x=X1, y=V2), colour = "red", size=0.3, alpha=0.8) + 
+  ggtitle("Black are test data, Red are predictions")
+p
+```
+
+```{r}
+# Function to unnormalise the data
+un_normalise <- function(y, orig_max, orig_min){
+  return(y*(orig_max-orig_min)+orig_min)
+}
+
+```
+
+```{r}
+pred_unnormalised <- un_normalise(pred_out, orig_min = orig_min, orig_max=orig_max)
+```
+
+```{r}
+train_unnormalised <- un_normalise(y_train, orig_min = orig_min, orig_max=orig_max)
+```
+
+
+```{r}
+unscale_data <- function(unnormalised_data, std, mean){
+  return(((unnormalised_data*std) + mean))
+}
+```
+
+
+```{r}
+train_unscaled <- unscale_data(train_unnormalised, std, mean)
+pred_unscaled <- unscale_data(pred_unnormalised, std, mean)
+#pred_unscaled
+#pred_data <- rbind(train_unscaled,pred_unscaled)
+```
+
+# Plotting
+```{r}
+# Plotting only works for 1 step forecasts
+other_x <- new_data$Date[(nrow(new_data)-474):nrow(new_data)]
+ggplot() +
+  geom_point(aes(x=other_x, y = new_data$load[(nrow(new_data)-474):nrow(new_data)])) +
+  geom_point(aes(x=other_x, y = pred_unscaled), colour="red") + 
+  ggtitle("Red are predictions")
+```
+
