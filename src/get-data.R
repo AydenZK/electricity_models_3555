@@ -147,3 +147,12 @@ filtered_all_data <- all_data %>%
     Year = as.numeric(Year)) %>% 
   select(DateTime, Year, Month, Day, Hours, 
          Minutes, AreaName, ResolutionCode, TotalLoadValue)
+
+daily_data <- filtered_all_data %>% 
+  mutate(Date=date(DateTime), Country=AreaName) %>%
+  group_by(Date, Country) %>%
+  summarise(TotalLoadValue = sum(TotalLoadValue), .groups="drop") %>%
+  as_tsibble(index="Date", key="Country")
+
+write.csv(daily_data, "../data/all_data_daily.csv")
+

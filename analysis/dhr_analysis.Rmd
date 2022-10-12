@@ -5,13 +5,6 @@ date: '2022-10-06'
 output: html_document
 ---
 
-```{r}
-source("../src/get-data.R")
-```
-
-```{r}
-getwd()
-```
 
 ```{r}
 library(fpp3)
@@ -20,34 +13,13 @@ library(glue)
 ```
 
 ```{r}
-as.POSIXct(glue('2014-1-1 7:00'), tz="")
-
-filtered_all_data %>% 
-  mutate(newdate = as.POSIXct(glue('{Year}-{Month}-{Day} {Hours}:00'), tz="")) %>%
-  select(newdate)
-
-filtered_all_data %>% 
-  mutate(Country=AreaName) %>%
-  group_by(Year, Month, Day, Hours, Country) %>%
-  summarise(TotalLoadValue = sum(TotalLoadValue), .groups="drop") %>%
-  mutate(Date = as.POSIXct(glue('{Year}-{Month}-{Day} {Hours}:00'), tz=""))
-
-
-data <- filtered_all_data %>% 
-  mutate(Date=date(DateTime), Country=AreaName) %>%
-  group_by(Date, Country) %>%
-  summarise(TotalLoadValue = sum(TotalLoadValue), .groups="drop") %>%
-  as_tsibble(index="Date", key="Country")
-
+data <- read.csv("../data/all_data_daily.csv") %>% 
+  mutate(Date = as.Date(Date, "%Y-%m-%d"))
 ``` 
 
 
 ```{r}
-elec_austria <- data %>% filter(Country=="Austria") %>% select(Date, TotalLoadValue)
-elec_belgium <- data %>% filter(Country=="Belgium") %>% select(Date, TotalLoadValue)
-elec_spain <- data %>% filter(Country=="Spain") %>% select(Date, TotalLoadValue)
-elec_croatia <- data %>% filter(Country=="Croatia") %>% select(Date, TotalLoadValue)
-elec_italy <- data %>% filter(Country=="Italy") %>% select(Date, TotalLoadValue)
+elec_austria <- data %>% filter(Country=="Austria") %>% select(Date, TotalLoadValue) %>% as_tsibble()
 ```
 
 
@@ -55,16 +27,55 @@ elec_italy <- data %>% filter(Country=="Italy") %>% select(Date, TotalLoadValue)
 elec_austria_fit <- elec_austria %>%
   model(
     dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
-                stepwise=FALSE,
-                order_constraint = (p+q <= 8 & P+Q <= 5))
+                stepwise=FALSE, order_constraint = (p+q <= 8 & P+Q <= 5)),
+    arima = ARIMA(TotalLoadValue, stepwise=FALSE, 
+                  order_constraint = (p+q <= 8 & P+Q <= 5)),
+    ets = ETS(TotalLoadValue)
   )
 
 accuracy(elec_austria_fit)
 
-autoplot(elec_austria)
-
-forecast(elec_austria_fit, h = 730) %>% autoplot(elec_austria %>% filter(Date >= "2017-06-01"))
 ```
+
+We notice that the DHR model has the lowest MAE, MAPE and RMSSE. 
+
+
+```{r}
+forecast(elec_austria_fit, h = 730) %>% 
+  autoplot(elec_austria %>% filter(Date >= "2017-06-01"))
+```
+
+From these forecasts we see that the DHR also does the best in picking up 
+the seasonal/cyclical behaviors.
+
+
+```{r}
+## Save Model
+forecast()
+
+dhr_mod = elec_austria_fit$dhr
+
+save(dhr_mod, file="../models/austria_dhr.rda")
+```
+
+
+
+## We tried other countries as well.
+
+```{r}
+elec_belgium <- data %>% filter(Country=="Belgium") %>% 
+  select(Date, TotalLoadValue) %>% as_tibble()
+
+elec_spain <- data %>% filter(Country=="Spain") %>% 
+  select(Date, TotalLoadValue) %>% as_tibble()
+
+elec_croatia <- data %>% filter(Country=="Croatia") %>% 
+  select(Date, TotalLoadValue) %>% as_tibble()
+
+elec_italy <- data %>% filter(Country=="Italy") %>% 
+  select(Date, TotalLoadValue) %>% as_tibble()
+```
+
 
 ```{r}
 elec_belgium_fit <- elec_belgium %>% fill_gaps() %>%
@@ -78,7 +89,8 @@ accuracy(elec_belgium_fit)
 
 autoplot(elec_belgium)
 
-forecast(elec_belgium_fit, h = 730) %>% autoplot(elec_belgium %>% filter(Date >= "2017-06-01"))
+forecast(elec_belgium_fit, h = 730) %>% 
+  autoplot(elec_belgium %>% filter(Date >= "2017-06-01"))
 ```
 
 ```{r}

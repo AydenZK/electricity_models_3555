@@ -1,0 +1,39 @@
+---
+title: "nn_analysis"
+author: "Ayden Zein Khalil 30604265"
+date: '2022-10-11'
+output: html_document
+---
+
+```{r}
+library(dplyr)
+install.packages("keras")
+install.packages("tensorflow")
+library(tensorflow)
+install_tensorflow(method = "auto")
+
+library(keras)
+install_keras(method = c("conda"), conda = "auto", tensorflow = "default",
+              extra_packages = c("tensorflow-hub"))
+```
+
+
+```{r}
+df <- read.csv("../data/austria_fe_daily.csv")
+```
+
+
+```{r}
+train_size = 0.75
+train_len = as.integer(nrow(df) * train_size)
+
+train_all <- df[1:train_len,]
+test_all <- df[(train_len+1):nrow(df),]
+
+X_train <- train_all %>% select(DayOfYear, YearSin, YearCos, Year)
+y_train <- train_all %>% select(TotalLoadValue)
+X_test <- test_all %>% select(DayOfYear, YearSin, YearCos, Year)
+y_test <- test_all %>% select(TotalLoadValue)
+
+```
+

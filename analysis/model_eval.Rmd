@@ -1,0 +1,75 @@
+---
+title: "model_eval"
+author: "Ayden Zein Khalil"
+date: '2022-10-12'
+output: html_document
+---
+
+```{r}
+library(dplyr)
+```
+
+## Load Data
+```{r}
+df <- read.csv("../data/all_data_daily.csv") %>% 
+  mutate(Date = as.Date(Date, "%Y-%m-%d"))
+
+
+## Train Test Split
+train_size = 0.75
+train_len = as.integer(nrow(df) * train_size)
+
+train_all <- df[1:train_len,]
+test_all <- df[(train_len+1):nrow(df),]
+
+X_train <- train_all %>% select(-c(TotalLoadValue))
+y_train <- train_all %>% select(TotalLoadValue)
+X_test <- test_all %>% select(-c(TotalLoadValue))
+y_test <- test_all %>% select(TotalLoadValue)
+```
+
+
+## Load/Fit Models
+
+```{r}
+load("../models/austria_dhr.rda")
+
+forecast()
+```
+
+
+
+
+## Visual Forecasts
+
+```{r}
+
+
+```
+
+
+## Metrics Comparison
+
+```{r}
+
+```
+
+
+## Flexibility/Scalability Test
+
+Different Countries
+Different Train Test Splits/Cross Validation?
+
+
+```{r}
+
+```
+
+
+## Model Explainability
+- Feature Importances (IV)
+
+```{r}
+
+```
+
