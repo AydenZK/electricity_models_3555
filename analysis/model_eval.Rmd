@@ -5,45 +5,62 @@ date: '2022-10-12'
 output: html_document
 ---
 
+## Imports
 ```{r}
 library(dplyr)
+library(fpp3)
 ```
 
-## Load Data
+## Globals
 ```{r}
-df <- read.csv("../data/all_data_daily.csv") %>% 
-  mutate(Date = as.Date(Date, "%Y-%m-%d"))
-
-
-## Train Test Split
-train_size = 0.75
-train_len = as.integer(nrow(df) * train_size)
-
-train_all <- df[1:train_len,]
-test_all <- df[(train_len+1):nrow(df),]
-
-X_train <- train_all %>% select(-c(TotalLoadValue))
-y_train <- train_all %>% select(TotalLoadValue)
-X_test <- test_all %>% select(-c(TotalLoadValue))
-y_test <- test_all %>% select(TotalLoadValue)
+TRAIN_START_DATE = "2014-12-01"
+TRAIN_END_DATE = "2019-10-19"
+TEST_START_DATE = "2019-10-18"
+TEST_END_DATE = "2021-06-02"
 ```
 
 
-## Load/Fit Models
+## 1. Load Data & Models
+
+### 1.1. DHR Data
 
 ```{r}
-load("../models/austria_dhr.rda")
+dhr_data = read.csv("../data/all_data_daily.csv") %>% 
+    mutate(Date = as.Date(Date, "%Y-%m-%d")) %>% 
+    filter(Country=="Austria") %>% 
+    select(Date, TotalLoadValue) %>% 
+    as_tsibble()
 
-forecast()
+dhr_train = dhr_data %>% filter(Date < TEST_START_DATE)
+dhr_test = dhr_data %>% filter(Date >= TEST_START_DATE)
 ```
 
 
-
-
-## Visual Forecasts
+### 1.2. Load DHR Model
 
 ```{r}
+load("../models/austria_dhr.rda") # dhr_mod loaded
+```
 
+
+### 1.3. Load NN model
+
+
+
+## 2. Visual Forecasts
+
+### 2.1. DHR Forecast
+```{r}
+h = length(dhr_test)
+
+forecast(dhr_mod, h = h) %>% 
+  autoplot(dhr_data %>% filter(Date >= "2016-01-01"))
+```
+
+
+### 2.2. NN Forecast
+
+```{r}
 
 ```
 
