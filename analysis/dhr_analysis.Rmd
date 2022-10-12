@@ -13,13 +13,18 @@ library(glue)
 ```
 
 ```{r}
+TEST_START_DATE = "2019-10-18"
+
 data <- read.csv("../data/all_data_daily.csv") %>% 
   mutate(Date = as.Date(Date, "%Y-%m-%d"))
+
+data_train <- data %>% filter(Date < TEST_START_DATE)
 ``` 
 
 
 ```{r}
-elec_austria <- data %>% filter(Country=="Austria") %>% select(Date, TotalLoadValue) %>% as_tsibble()
+elec_austria <- data_train %>% filter(Country=="Austria") %>% 
+  select(Date, TotalLoadValue) %>% as_tsibble() 
 ```
 
 
@@ -63,16 +68,16 @@ save(dhr_mod, file="../models/austria_dhr.rda")
 ## We tried other countries as well.
 
 ```{r}
-elec_belgium <- data %>% filter(Country=="Belgium") %>% 
+elec_belgium <- data_train %>% filter(Country=="Belgium") %>% 
   select(Date, TotalLoadValue) %>% as_tibble()
 
-elec_spain <- data %>% filter(Country=="Spain") %>% 
+elec_spain <- data_train %>% filter(Country=="Spain") %>% 
   select(Date, TotalLoadValue) %>% as_tibble()
 
-elec_croatia <- data %>% filter(Country=="Croatia") %>% 
+elec_croatia <- data_train %>% filter(Country=="Croatia") %>% 
   select(Date, TotalLoadValue) %>% as_tibble()
 
-elec_italy <- data %>% filter(Country=="Italy") %>% 
+elec_italy <- data_train %>% filter(Country=="Italy") %>% 
   select(Date, TotalLoadValue) %>% as_tibble()
 ```
 
