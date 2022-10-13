@@ -19,11 +19,11 @@ model <- keras_model_sequential() %>%
   layer_dense(1, activation = "linear")
 
 # LR scheduler
-lr_schedule <- learning_rate_schedule_cosine_decay(initial_learning_rate=FLAGS$learning_rate, decay_steps = FLAGS$decay_steps)
+#lr_schedule <- learning_rate_schedule_cosine_decay(initial_learning_rate=FLAGS$learning_rate, decay_steps = FLAGS$decay_steps)
 
 
 # Compile w/ optimiser and loss
-model %>% compile(optimizer = optimizer_adam(learning_rate = lr_schedule), loss = 'mean_absolute_error')
+model %>% compile(optimizer = optimizer_adam(learning_rate = FLAGS$learning_rate), loss = 'mean_absolute_error')
 
 # Fit 
 set.seed(2022)
