@@ -9,6 +9,9 @@ output: html_document
 ```{r}
 library(dplyr)
 library(fpp3)
+library(glue)
+library(ggplot2)
+library(Metrics)
 ```
 
 ## Globals
@@ -16,7 +19,7 @@ library(fpp3)
 TRAIN_START_DATE = "2014-12-01"
 TRAIN_END_DATE = "2019-10-19"
 TEST_START_DATE = "2019-10-18"
-TEST_END_DATE = "2021-06-02"
+TEST_END_DATE = "2021-06-01"
 ```
 
 
@@ -25,16 +28,22 @@ TEST_END_DATE = "2021-06-02"
 ### 1.1. DHR Data
 
 ```{r}
-dhr_data = read.csv("../data/all_data_daily.csv") %>% 
+data = read.csv("../data/all_data_daily.csv") %>% 
     mutate(Date = as.Date(Date, "%Y-%m-%d")) %>% 
     filter(Country=="Austria") %>% 
     select(Date, TotalLoadValue) %>% 
     as_tsibble()
 
-dhr_train = dhr_data %>% filter(Date < TEST_START_DATE)
-dhr_test = dhr_data %>% filter(Date >= TEST_START_DATE)
-```
+train = data %>% filter(
+  Date >= TRAIN_START_DATE,
+  Date <= TRAIN_END_DATE)
 
+test = data %>% filter(
+  Date >= TEST_START_DATE,
+  Date <= TEST_END_DATE)
+
+forecast_days = nrow(test)
+```
 
 ### 1.2. Load DHR Model
 
@@ -43,50 +52,244 @@ load("../models/austria_dhr.rda") # dhr_mod loaded
 ```
 
 
-### 1.3. Load NN model
+### 1.3. Load DHR Predictions
 
+```{r}
+dhr_preds <- dhr_mod %>% 
+  forecast(h=forecast_days) %>% 
+  as_tsibble(index=Date) %>%
+  select(Date, .mean) %>%
+  rename(TotalLoadValue = .mean)
+```
+
+
+### 1.4. Load NN Predictions
+```{r}
+nn_preds_raw <- read.csv("../models/predictions/raw_nn_preds.csv")
+
+nn_preds <- nn_preds_raw %>% 
+  mutate(Date = ymd(glue("{Year}-{Month}-{Day}"))) %>%
+  select(Date, TotalLoadValue) %>% 
+  filter(Date >= TEST_START_DATE, Date <= TEST_END_DATE) %>% 
+  as_tsibble(index=Date)
+
+l2_preds <- read.csv("../models/predictions/model_2.csv") %>% 
+  mutate(Date = ymd(glue("{Year}-{Month}-{Day}"))) %>%
+  select(Date, TotalLoadValue) %>% 
+  filter(Date >= TEST_START_DATE, Date <= TEST_END_DATE) %>% 
+  as_tsibble(index=Date)
+
+
+l3_preds <- read.csv("../models/predictions/model_3layer.csv") %>% 
+  mutate(Date = ymd(glue("{Year}-{Month}-{Day}"))) %>%
+  select(Date, TotalLoadValue) %>% 
+  filter(Date >= TEST_START_DATE, Date <= TEST_END_DATE) %>% 
+  as_tsibble(index=Date)
+```
 
 
 ## 2. Visual Forecasts
 
 ### 2.1. DHR Forecast
 ```{r}
-h = length(dhr_test)
-
-forecast(dhr_mod, h = h) %>% 
-  autoplot(dhr_data %>% filter(Date >= "2016-01-01"))
+forecast(dhr_mod, h = forecast_days) %>% 
+  autoplot(train) + labs(title="DHR Forecasts: Austria")
 ```
 
 
 ### 2.2. NN Forecast
 
 ```{r}
+plot_nn <- function(train, pred, title) {
+  ggplot() + 
+    geom_line(data=train, aes(x=Date, y=TotalLoadValue)) +
+    geom_line(data=pred, aes(x=Date, y=TotalLoadValue), color="red") + 
+    labs(title=title)
+}
+
+plot_nn(train, nn_preds, "NN Forecasts: Austria") + ylim(0, 1.4e6)
+```
+
+```{r}
+plot_nn(train, l3_preds, "NN Forecasts: 3layer") + ylim(0, 1.4e6)
+plot_nn(train, l2_preds, "NN Forecasts: 2layer") + ylim(0, 1.4e6)
+```
+
+
+### 2.3. Comparison
+
+```{r}
+cmap <- c("DHR" = "blue", "NN" = "red", "True" = "black")
+
+ggplot() + 
+  geom_line(data=test, aes(x=Date, y=TotalLoadValue, color="True")) +
+  geom_line(data=nn_preds, aes(x=Date, y=TotalLoadValue, color="NN"), alpha=0.3) + 
+  geom_line(data=dhr_preds, aes(x=Date, y=TotalLoadValue, color="DHR"), alpha=0.3) + 
+  labs(color = "Legend", title="Test Set Prediction: Austria") + 
+  scale_color_manual(values = cmap)
 
 ```
 
 
-## Metrics Comparison
+## 3. Metrics Comparison
 
+```{r}
+calc_metrics <- function(mod_preds, trues, labels) {
+  rmses = c()
+  maes = c()
+  mapes = c()
+  
+  for (i in 1:length(mod_preds)) {
+    print(labels[i])
+    preds = mod_preds[[i]]$TotalLoadValue
+    
+    rmses = append(rmses, rmse(preds, trues))
+    maes = append(maes, mae(preds, trues))
+    mapes = append(mapes, mape(preds, trues))
+  }
+  
+  data.frame(
+    .model = labels,
+    RMSE = rmses,
+    MAE = maes,
+    MAPE = mapes
+  )
+  
+}
+
+mod_preds = list()
+mod_preds[[1]] = dhr_preds
+mod_preds[[2]] = nn_preds
+mod_preds[[3]] = l3_preds
+mod_preds[[4]] = l2_preds
+
+calc_metrics(
+  mod_preds, 
+  test$TotalLoadValue, 
+  c("DHR", "DefaultNet", "3Layer", "2Layer")) %>%
+  arrange(MAPE)
+
+
+```
+
+## 4. Flexibility/Scalability Test
+
+
+### 4.1. Load DHR Models & Data
+```{r}
+source("../src/train_dhr.R")
+
+belgium_mod <- train_dhr_model(country="Belgium")
+belgium_data <- load_dhr_data(country="Belgium")
+
+italy_mod <- train_dhr_model(country="Italy")
+italy_data <- load_dhr_data(country="Italy")
+
+spain_mod <- train_dhr_model(country="Spain")
+spain_data <- load_dhr_data(country="Spain")
+```
+
+```{r}
+data = list()
+
+raw = read.csv("../data/all_data_hourly.csv") %>% 
+    filter(AreaName == "Belgium") %>% 
+    mutate(
+        Date = as.Date(DateTime),
+        dayofweek = ifelse(weekdays(Date) %in% c("Saturday", "Sunday"), 1, 0)
+    ) %>%
+    select(Year, Month, Day, Hours, dayofweek, TotalLoadValue)
+
+# Create unstandardised dataset
+lagged_data_usd <- raw %>% 
+    mutate(
+        "hour-1" = lag(TotalLoadValue, n=1), 
+        "hour-2" = lag(TotalLoadValue, n=2),
+        "day-1" = lag(TotalLoadValue, n=24), 
+        "day-7" = lag(TotalLoadValue, n=168)) %>% 
+    select(Year, Month, Day, Hours, dayofweek, TotalLoadValue, `day-1`, `day-7`, `hour-1`, `hour-2`) %>%
+    tail(-168)
+
+# Create standardised dataset
+lagged_data_sd <- raw %>% 
+    mutate(
+        "hour-1" = lag(TotalLoadValue, n=1), 
+        "hour-2" = lag(TotalLoadValue, n=2),
+        "day-1" = lag(TotalLoadValue, n=24), 
+        "day-7" = lag(TotalLoadValue, n=168)) %>% 
+    select(Year, Month, Day, Hours, dayofweek, TotalLoadValue, `day-1`, `day-7`, `hour-1`, `hour-2`) %>% 
+    mutate(`day-1`= sqrt(`day-1`), `day-7`= sqrt(`day-7`), `hour-1`= sqrt(`hour-1`), `hour-2`= sqrt(`hour-2`)) %>% 
+    tail(-168)
+
+# Sin/cosine transform the time variables
+lagged_data_sd$Hours_sin = sin(2*pi*lagged_data_sd$Hours/24)
+lagged_data_sd$Hours_cos = cos(2*pi*lagged_data_sd$Hours/24)
+lagged_data_sd$Month_sin = cos(2*pi*lagged_data_sd$Month/12)
+lagged_data_sd$Month_cos = cos(2*pi*lagged_data_sd$Month/12)
+lagged_data_sd$Day_sin = cos(2*pi*lagged_data_sd$Day/31)
+lagged_data_sd$Day_cos = cos(2*pi*lagged_data_sd$Day/31)
+
+lagged_data_usd$Hours_sin = sin(2*pi*lagged_data_usd$Hours/24)
+lagged_data_usd$Hours_cos = cos(2*pi*lagged_data_usd$Hours/24)
+lagged_data_usd$Month_sin = cos(2*pi*lagged_data_usd$Month/12)
+lagged_data_usd$Month_cos = cos(2*pi*lagged_data_usd$Month/12)
+lagged_data_usd$Day_sin = cos(2*pi*lagged_data_usd$Day/31)
+lagged_data_usd$Day_cos = cos(2*pi*lagged_data_usd$Day/31)
+
+# Remove outliers
+lagged_data_sd <- lagged_data_sd[!lagged_data_sd$TotalLoadValue %in% boxplot.stats(lagged_data_sd$TotalLoadValue)$out,]
+lagged_data_usd <- lagged_data_usd[!lagged_data_usd$TotalLoadValue %in% boxplot.stats(lagged_data_usd$TotalLoadValue)$out,]
+
+
+```
+
+
+### 4.2. Load NN Models & Data
+```{r}
+source("../src/train_dnn.R")
+
+belgium_nn <- train_nn_model(country="Belgium")
+belgium_data_nn <- load_nn_data(country="Belgium")
+
+spain_nn <- train_nn_model(country="Spain")
+spain_data_nn <- load_nn_data(country="Spain")
+
+italy_nn <- train_nn_model(country="Italy")
+italy_data_nn <- load_nn_data(country="Italy")
+```
+
+### 4.3. Generate DHR Predictions
+```{r}
+belgium_dhr_preds <- generate_dhr_preds_df(belgium_mod, forecast_days)
+italy_dhr_preds <- generate_dhr_preds_df(italy_mod, forecast_days)
+spain_dhr_preds <- generate_dhr_preds_df(spain_mod, forecast_days)
+```
+
+### 4.4. Generate NN Predictions
+```{r}
+belgium_nn_preds <- generate_nn_preds_df(belgium_nn, belgium_data_nn)
+italy_nn_preds <- generate_nn_preds_df(italy_nn, italy_data_nn)
+spain_nn_preds <- generate_nn_preds_df(spain_nn, spain_data_nn)
+```
+
+### 4.5. DHR Visual Forecasts
+```{r}
+belgium_mod %>% 
+  forecast(h=forecast_days) %>% 
+  autoplot(belgium_data$train) + labs(title="DHR Forecast Belgium")
+
+italy_mod %>% 
+  forecast(h=forecast_days) %>% 
+  autoplot(italy_data$train) + labs(title="DHR Forecast Italy")
+
+spain_mod %>% 
+  forecast(h=forecast_days) %>% 
+  autoplot(spain_data$train) + labs(title="DHR Forecast Spain")
+```
+
+### 4.6. DHR Visual Forecasts
 ```{r}
 
 ```
 
-
-## Flexibility/Scalability Test
-
-Different Countries
-Different Train Test Splits/Cross Validation?
-
-
-```{r}
-
-```
-
-
-## Model Explainability
-- Feature Importances (IV)
-
-```{r}
-
-```
-
+### 4.7. Model Comparison

@@ -3,8 +3,6 @@ library(readxl)
 library(fpp3)
 library(readabs)
 
-# setwd("C://Users//Ayden//OneDrive - Monash University//Uni//2022 S2//ETC3555//electricity_models_3555//data//raw")
-
 countries <- read_excel("country_assoc.xlsx") %>% mutate(AreaCode = areacode) %>% select(AreaCode,AreaName)
 
 
@@ -148,11 +146,16 @@ filtered_all_data <- all_data %>%
   select(DateTime, Year, Month, Day, Hours, 
          Minutes, AreaName, ResolutionCode, TotalLoadValue)
 
+write.csv(filtered_all_data, "../filtered_all_data.csv")
+print("Data saved: filtered_all_data.csv")
+
 daily_data <- filtered_all_data %>% 
   mutate(Date=date(DateTime), Country=AreaName) %>%
   group_by(Date, Country) %>%
   summarise(TotalLoadValue = sum(TotalLoadValue), .groups="drop") %>%
   as_tsibble(index="Date", key="Country")
 
-write.csv(daily_data, "../data/all_data_daily.csv")
+write.csv(daily_data, "../all_data_daily.csv")
+print("Data saved: all_data_daily.csv")
+
 
