@@ -157,7 +157,7 @@ generate_nn_preds_df <- function (mod, data) {
             predictions[i,] <- c(i, prediction_i)
         }
         pb$tick()
-        if {i %% 1000 == 0} {print(glue("Iteration: {i}"))}
+        if (i %% 1000 == 0) {print(glue("Iteration: {i}"))}
     }
 
     final_predictions <- predictions %>% mutate(TotalLoadValue = prediction^2) 

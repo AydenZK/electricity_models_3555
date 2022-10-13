@@ -9,25 +9,15 @@ output: html_document
 ```{r}
 library(fpp3)
 library(dplyr)
+
+source("../src/train_dhr.R")
 ```
 
-```{r}
-TEST_START_DATE = "2019-10-18"
-
-data <- read.csv("../data/all_data_daily.csv") %>% 
-  mutate(Date = as.Date(Date, "%Y-%m-%d"))
-
-data_train <- data %>% filter(Date < TEST_START_DATE)
-``` 
-
 
 ```{r}
-elec_austria <- data_train %>% filter(Country=="Austria") %>% 
-  select(Date, TotalLoadValue) %>% as_tsibble() 
-```
+austria <- load_dhr_data("Austria")
 
-```{r}
-elec_austria_fit <- elec_austria %>% 
+elec_austria_fit <- austria$train %>% 
   model(
     dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
                 stepwise=FALSE, order_constraint = (p+q <= 6 & P+Q <= 2)),
@@ -43,8 +33,8 @@ We notice that the DHR model has the lowest MAE, MAPE and RMSSE.
 
 
 ```{r}
-forecast(elec_austria_fit, h = 730) %>% 
-  autoplot(elec_austria %>% filter(Date >= "2017-06-01"))
+forecast(elec_austria_fit, h = 400) %>% 
+  autoplot(austria$train)
 ```
 
 From these forecasts we see that the DHR also does the best in picking up 
@@ -54,7 +44,7 @@ the seasonal/cyclical behaviors.
 ```{r}
 # Model Details
 dhr_mod = elec_austria_fit$dhr
-dhr_mod %>% report()
+dhr_mod
 ```
 
 We see that the model is an a regression with K=4 Fourier terms and ARIMA(5,0,1)(2,1,0)[7] errors.
@@ -69,21 +59,14 @@ save(dhr_mod, file="../models/austria_dhr.rda")
 ### We tried other countries as well, as we see that the grid search does not provide as good a fit.
 
 ```{r}
-elec_belgium <- data_train %>% filter(Country=="Belgium") %>% 
-  select(Date, TotalLoadValue) %>% as_tibble()
-
-elec_spain <- data_train %>% filter(Country=="Spain") %>% 
-  select(Date, TotalLoadValue) %>% as_tibble()
-
-elec_croatia <- data_train %>% filter(Country=="Croatia") %>% 
-  select(Date, TotalLoadValue) %>% as_tibble()
-
-elec_italy <- data_train %>% filter(Country=="Italy") %>% 
-  select(Date, TotalLoadValue) %>% as_tibble()
+belgium <- load_dhr_data("Belgium")
+italy <- load_dhr_data("Italy")
+croatia <- load_dhr_data("Croatia")
+spain <- load_dhr_data("Spain")
 ```
 
 ```{r}
-elec_belgium_fit <- elec_belgium %>% fill_gaps() %>%
+elec_belgium_fit <- belgium$train %>%
   model(
     dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
                 stepwise=FALSE,
@@ -92,14 +75,12 @@ elec_belgium_fit <- elec_belgium %>% fill_gaps() %>%
 
 accuracy(elec_belgium_fit)
 
-autoplot(elec_belgium)
-
-forecast(elec_belgium_fit, h = 730) %>% 
-  autoplot(elec_belgium %>% filter(Date >= "2017-06-01"))
+forecast(elec_belgium_fit, h = 400) %>% 
+  autoplot(belgium$train)
 ```
 
 ```{r}
-elec_spain_fit <- elec_spain %>% fill_gaps() %>%
+elec_spain_fit <- spain$train %>%
   model(
     dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
                 stepwise=FALSE,
@@ -108,13 +89,12 @@ elec_spain_fit <- elec_spain %>% fill_gaps() %>%
 
 accuracy(elec_spain_fit)
 
-autoplot(elec_spain)
 
-forecast(elec_spain_fit, h = 730) %>% autoplot(elec_spain %>% filter(Date >= "2017-06-01"))
+forecast(elec_spain_fit, h = 400) %>% autoplot(elec_spain$train)
 ```
 
 ```{r}
-elec_croatia_fit <- elec_croatia %>% fill_gaps() %>%
+elec_croatia_fit <- croatia$train %>%
   model(
     dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
                 stepwise=FALSE,
@@ -123,14 +103,13 @@ elec_croatia_fit <- elec_croatia %>% fill_gaps() %>%
 
 accuracy(elec_croatia_fit)
 
-autoplot(elec_croatia)
 
-forecast(elec_croatia_fit, h = 730) %>% autoplot(elec_croatia %>% filter(Date >= "2017-06-01"))
+forecast(elec_croatia_fit, h = 400) %>% autoplot(croatia$train)
 ```
 
 
 ```{r}
-elec_italy_fit <- elec_italy %>% fill_gaps() %>%
+elec_italy_fit <- italy$train %>%
   model(
     dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
                 stepwise=FALSE,
@@ -141,5 +120,5 @@ accuracy(elec_italy_fit)
 
 autoplot(elec_italy)
 
-forecast(elec_italy_fit, h = 730) %>% autoplot(elec_italy %>% filter(Date >= "2017-06-01"))
+forecast(elec_italy_fit, h = 400) %>% autoplot(italy$train)
 ```

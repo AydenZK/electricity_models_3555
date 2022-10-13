@@ -140,7 +140,6 @@ calc_metrics <- function(mod_preds, trues, labels) {
   mapes = c()
   
   for (i in 1:length(mod_preds)) {
-    print(labels[i])
     preds = mod_preds[[i]]$TotalLoadValue
     
     rmses = append(rmses, rmse(preds, trues))
@@ -187,60 +186,6 @@ italy_data <- load_dhr_data(country="Italy")
 
 spain_mod <- train_dhr_model(country="Spain")
 spain_data <- load_dhr_data(country="Spain")
-```
-
-```{r}
-data = list()
-
-raw = read.csv("../data/all_data_hourly.csv") %>% 
-    filter(AreaName == "Belgium") %>% 
-    mutate(
-        Date = as.Date(DateTime),
-        dayofweek = ifelse(weekdays(Date) %in% c("Saturday", "Sunday"), 1, 0)
-    ) %>%
-    select(Year, Month, Day, Hours, dayofweek, TotalLoadValue)
-
-# Create unstandardised dataset
-lagged_data_usd <- raw %>% 
-    mutate(
-        "hour-1" = lag(TotalLoadValue, n=1), 
-        "hour-2" = lag(TotalLoadValue, n=2),
-        "day-1" = lag(TotalLoadValue, n=24), 
-        "day-7" = lag(TotalLoadValue, n=168)) %>% 
-    select(Year, Month, Day, Hours, dayofweek, TotalLoadValue, `day-1`, `day-7`, `hour-1`, `hour-2`) %>%
-    tail(-168)
-
-# Create standardised dataset
-lagged_data_sd <- raw %>% 
-    mutate(
-        "hour-1" = lag(TotalLoadValue, n=1), 
-        "hour-2" = lag(TotalLoadValue, n=2),
-        "day-1" = lag(TotalLoadValue, n=24), 
-        "day-7" = lag(TotalLoadValue, n=168)) %>% 
-    select(Year, Month, Day, Hours, dayofweek, TotalLoadValue, `day-1`, `day-7`, `hour-1`, `hour-2`) %>% 
-    mutate(`day-1`= sqrt(`day-1`), `day-7`= sqrt(`day-7`), `hour-1`= sqrt(`hour-1`), `hour-2`= sqrt(`hour-2`)) %>% 
-    tail(-168)
-
-# Sin/cosine transform the time variables
-lagged_data_sd$Hours_sin = sin(2*pi*lagged_data_sd$Hours/24)
-lagged_data_sd$Hours_cos = cos(2*pi*lagged_data_sd$Hours/24)
-lagged_data_sd$Month_sin = cos(2*pi*lagged_data_sd$Month/12)
-lagged_data_sd$Month_cos = cos(2*pi*lagged_data_sd$Month/12)
-lagged_data_sd$Day_sin = cos(2*pi*lagged_data_sd$Day/31)
-lagged_data_sd$Day_cos = cos(2*pi*lagged_data_sd$Day/31)
-
-lagged_data_usd$Hours_sin = sin(2*pi*lagged_data_usd$Hours/24)
-lagged_data_usd$Hours_cos = cos(2*pi*lagged_data_usd$Hours/24)
-lagged_data_usd$Month_sin = cos(2*pi*lagged_data_usd$Month/12)
-lagged_data_usd$Month_cos = cos(2*pi*lagged_data_usd$Month/12)
-lagged_data_usd$Day_sin = cos(2*pi*lagged_data_usd$Day/31)
-lagged_data_usd$Day_cos = cos(2*pi*lagged_data_usd$Day/31)
-
-# Remove outliers
-lagged_data_sd <- lagged_data_sd[!lagged_data_sd$TotalLoadValue %in% boxplot.stats(lagged_data_sd$TotalLoadValue)$out,]
-lagged_data_usd <- lagged_data_usd[!lagged_data_usd$TotalLoadValue %in% boxplot.stats(lagged_data_usd$TotalLoadValue)$out,]
-
-
 ```
 
 
@@ -293,3 +238,7 @@ spain_mod %>%
 ```
 
 ### 4.7. Model Comparison
+```{r}
+
+```
+
