@@ -9,7 +9,6 @@ output: html_document
 ```{r}
 library(fpp3)
 library(dplyr)
-library(glue)
 ```
 
 ```{r}
@@ -27,19 +26,17 @@ elec_austria <- data_train %>% filter(Country=="Austria") %>%
   select(Date, TotalLoadValue) %>% as_tsibble() 
 ```
 
-
 ```{r}
-elec_austria_fit <- elec_austria %>%
+elec_austria_fit <- elec_austria %>% 
   model(
     dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
-                stepwise=FALSE, order_constraint = (p+q <= 8 & P+Q <= 5)),
+                stepwise=FALSE, order_constraint = (p+q <= 6 & P+Q <= 2)),
     arima = ARIMA(TotalLoadValue, stepwise=FALSE, 
-                  order_constraint = (p+q <= 8 & P+Q <= 5)),
+                  order_constraint = (p+q <= 6 & P+Q <= 2)),
     ets = ETS(TotalLoadValue)
   )
 
 accuracy(elec_austria_fit)
-
 ```
 
 We notice that the DHR model has the lowest MAE, MAPE and RMSSE. 
@@ -55,17 +52,21 @@ the seasonal/cyclical behaviors.
 
 
 ```{r}
-## Save Model
-forecast()
-
+# Model Details
 dhr_mod = elec_austria_fit$dhr
+dhr_mod %>% report()
+```
 
+We see that the model is an a regression with K=4 Fourier terms and ARIMA(5,0,1)(2,1,0)[7] errors.
+
+
+```{r}
+## Save Model
 save(dhr_mod, file="../models/austria_dhr.rda")
 ```
 
 
-
-## We tried other countries as well.
+### We tried other countries as well, as we see that the grid search does not provide as good a fit.
 
 ```{r}
 elec_belgium <- data_train %>% filter(Country=="Belgium") %>% 
@@ -81,13 +82,12 @@ elec_italy <- data_train %>% filter(Country=="Italy") %>%
   select(Date, TotalLoadValue) %>% as_tibble()
 ```
 
-
 ```{r}
 elec_belgium_fit <- elec_belgium %>% fill_gaps() %>%
   model(
     dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
                 stepwise=FALSE,
-                order_constraint = (p+q <= 8 & P+Q <= 5))
+                order_constraint = (p+q <= 6 & P+Q <= 2))
   )
 
 accuracy(elec_belgium_fit)
@@ -103,7 +103,7 @@ elec_spain_fit <- elec_spain %>% fill_gaps() %>%
   model(
     dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
                 stepwise=FALSE,
-                order_constraint = (p+q <= 8 & P+Q <= 5))
+                order_constraint = (p+q <= 6 & P+Q <= 2))
   )
 
 accuracy(elec_spain_fit)
@@ -113,13 +113,12 @@ autoplot(elec_spain)
 forecast(elec_spain_fit, h = 730) %>% autoplot(elec_spain %>% filter(Date >= "2017-06-01"))
 ```
 
-
 ```{r}
 elec_croatia_fit <- elec_croatia %>% fill_gaps() %>%
   model(
     dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
                 stepwise=FALSE,
-                order_constraint = (p+q <= 8 & P+Q <= 5))
+                order_constraint = (p+q <= 6 & P+Q <= 2))
   )
 
 accuracy(elec_croatia_fit)
@@ -135,7 +134,7 @@ elec_italy_fit <- elec_italy %>% fill_gaps() %>%
   model(
     dhr = ARIMA(TotalLoadValue ~ fourier(period="year", K=4), 
                 stepwise=FALSE,
-                order_constraint = (p+q <= 8 & P+Q <= 5))
+                order_constraint = (p+q <= 6 & P+Q <= 2))
   )
 
 accuracy(elec_italy_fit)
