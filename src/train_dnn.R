@@ -92,14 +92,28 @@ train_nn_model <- function(country) {
     print("Data Loaded")
 
     model1 <- keras_model_sequential() %>%
-        layer_dense(64, activation = "relu") %>%
-        layer_dense(64, activation = "relu") %>%
-        layer_dense(1, activation = "linear")
+    layer_dense(128, activation = "relu") %>%
+    layer_dense(128, activation = "relu") %>%
+    layer_dense(64, activation = "relu") %>%
+    layer_dense(1, activation = "linear")
 
-    model1 <- model1 %>% 
-        compile(optimizer = optimizer_adam(), loss = 'mean_absolute_error')
+    # Compile w/ optimiser and loss
+    model1 %>% compile(optimizer = optimizer_adam(learning_rate = 0.005), loss = 'mean_absolute_error', metrics=c("mape"))
 
-    model1 %>% fit(as.matrix(d$X_train), as.matrix(d$y_train), validation_split = 0.2, epochs = 15)
+    # Early stopping
+    early_stopping <- callback_early_stopping(monitor="loss", min_delta = 10, patience=5, mode="min")
+
+    # Fit 
+    set.seed(2022)
+    model1 %>% 
+        fit(
+            x = as.matrix(X_train), 
+            y = as.matrix(y_train), 
+            validation_split = 0.2, 
+            batch_size = 32,
+            epochs = 33,
+            callbacks = list(early_stopping)
+        )
     print("Model Trained")
 
     return(model1)
