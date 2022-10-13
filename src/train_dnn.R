@@ -73,13 +73,13 @@ load_nn_data <- function(country) {
         Date <= TEST_END_DATE) %>% 
         mutate(`day-1`= sqrt(`day-1`), `day-7`= sqrt(`day-7`), `hour-1`= sqrt(`hour-1`), `hour-2`= sqrt(`hour-2`))
 
-    data$X_train = train %>% select(-Year, -TotalLoadValue, -Hours, -Day, -Month)
+    data$X_train = train %>% select(-Year, -TotalLoadValue, -Hours, -Day, -Month, -Date)
     data$y_train = train %>% select(TotalLoadValue)
 
-    data$X_test = test %>% select(-Year, -TotalLoadValue, -Hours, -Day, -Month)
+    data$X_test = test %>% select(-Year, -TotalLoadValue, -Hours, -Day, -Month, -Date)
     data$y_test = test %>% select(TotalLoadValue)
 
-    data$X_test_pred <- test_pred %>% select(-Year, -TotalLoadValue, -Hours, -Day, -Month)
+    data$X_test_pred <- test_pred %>% select(-Year, -TotalLoadValue, -Hours, -Day, -Month, -Date)
     data$Y_test_pred = test %>% select(TotalLoadValue) %>% mutate(TotalLoadValue = TotalLoadValue)
     data$train = train
     data$test = test
@@ -111,7 +111,7 @@ save_predictions <- function(df, country) {
     print(glue("Predictions csv saved to {path}"))
 }
 
-generate_nn_preds_df <- function (mod, data) {
+generate_nn_preds_df <- function (mod, data, country) {
     X_test_pred = data$X_test_pred
     Y_test_pred = data$Y_test_pred
     test = data$test
@@ -153,7 +153,6 @@ generate_nn_preds_df <- function (mod, data) {
             predictions[i,] <- c(i, prediction_i)
         }
         pb$tick()
-        if (i %% 1000 == 0) {print(glue("Iteration: {i}"))}
     }
 
     final_predictions <- predictions %>% mutate(TotalLoadValue = prediction^2) 

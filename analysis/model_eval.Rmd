@@ -193,11 +193,6 @@ spain_data <- load_dhr_data(country="Spain")
 ```{r}
 source("../src/train_dnn.R")
 
-raw = read.csv("../data/all_data_hourly.csv") %>% 
-    filter(AreaName == "Belgium") %>% 
-    select(Year, Date, Month, Day, Hours, dayofweek, TotalLoadValue)
-
-
 belgium_nn <- train_nn_model(country="Belgium")
 belgium_data_nn <- load_nn_data(country="Belgium")
 
@@ -217,9 +212,23 @@ spain_dhr_preds <- generate_dhr_preds_df(spain_mod, forecast_days)
 
 ### 4.4. Generate NN Predictions
 ```{r}
-belgium_nn_preds <- generate_nn_preds_df(belgium_nn, belgium_data_nn)
-italy_nn_preds <- generate_nn_preds_df(italy_nn, italy_data_nn)
-spain_nn_preds <- generate_nn_preds_df(spain_nn, spain_data_nn)
+if (file.exists("../models/predictions/nn_Belgium.csv")) {
+  belgium_nn_preds <- read.csv("../models/predictions/nn_Belgium.csv")
+} else {
+  belgium_nn_preds <- generate_nn_preds_df(belgium_nn, belgium_data_nn, "Belgium")
+}
+
+if (file.exists("../models/predictions/nn_Italy.csv")) {
+  italy_nn_preds <- read.csv("../models/predictions/nn_Italy.csv")
+} else {
+  italy_nn_preds <- generate_nn_preds_df(italy_nn, italy_data_nn, "Italy")
+}
+
+if (file.exists("../models/predictions/nn_Spain.csv")) {
+  spain_nn_preds <- read.csv("../models/predictions/nn_Spain.csv")
+} else {
+  spain_nn_preds <- generate_nn_preds_df(spain_nn, spain_data_nn, "Spain")
+}
 ```
 
 ### 4.5. DHR Visual Forecasts
@@ -239,9 +248,9 @@ spain_mod %>%
 
 ### 4.6. DHR Visual Forecasts
 ```{r}
-plot_nn(belgium_data_nn$train, belgium_nn_preds, "NN Forecasts: Belgium")
-plot_nn(italy_data_nn$train, italy_nn_preds, "NN Forecasts: Belgium")
-plot_nn(spain_data_nn$train, spain_nn_preds, "NN Forecasts: Belgium")
+plot_nn(belgium_data$train, belgium_nn_preds, "NN Forecasts: Belgium")
+plot_nn(italy_data$train, italy_nn_preds, "NN Forecasts: Belgium")
+plot_nn(spain_data$train, spain_nn_preds, "NN Forecasts: Belgium")
 ```
 
 ### 4.7. Model Comparison
