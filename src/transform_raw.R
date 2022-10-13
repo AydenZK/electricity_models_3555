@@ -189,7 +189,7 @@ write.csv(filtered_all_data, "../data/all_data_hourly.csv")
 print("Data saved: data/all_data_hourly.csv")
 
 daily_data <- filtered_all_data %>% 
-  mutate(Date=date(DateTime), Country=AreaName) %>%
+  mutate(Date=Date, Country=AreaName) %>%
   group_by(Date, Country) %>%
   summarise(TotalLoadValue = sum(TotalLoadValue), .groups="drop") %>%
   as_tsibble(index="Date", key="Country")
