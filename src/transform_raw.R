@@ -180,10 +180,9 @@ filtered_all_data <- all_data %>%
     Year = as.numeric(Year),
     Date = ymd(glue("{Year}-{Month}-{Day}")),
     dayofweek = ifelse(weekdays(Date) %in% c("Saturday", "Sunday"), 1, 0)) %>% 
-  select(DateTime, Year, Month, Day, Hours, dayofweek,
-         Minutes, AreaName, ResolutionCode, TotalLoadValue) %>% 
-  group_by(Year, Month, Day, Hours, AreaName, dayofweek) %>% 
-  summarise(TotalLoadValue = sum(TotalLoadValue))
+    select(Date, DateTime, Year, Month, Day, Hours, dayofweek, Minutes, AreaName, ResolutionCode, TotalLoadValue) %>% 
+    group_by(Date, Year, Month, Day, Hours, AreaName, dayofweek) %>% 
+    summarise(TotalLoadValue = sum(TotalLoadValue))
 
 write.csv(filtered_all_data, "../data/all_data_hourly.csv")
 print("Data saved: data/all_data_hourly.csv")
