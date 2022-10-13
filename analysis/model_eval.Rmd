@@ -193,6 +193,11 @@ spain_data <- load_dhr_data(country="Spain")
 ```{r}
 source("../src/train_dnn.R")
 
+raw = read.csv("../data/all_data_hourly.csv") %>% 
+    filter(AreaName == "Belgium") %>% 
+    select(Year, Date, Month, Day, Hours, dayofweek, TotalLoadValue)
+
+
 belgium_nn <- train_nn_model(country="Belgium")
 belgium_data_nn <- load_nn_data(country="Belgium")
 
@@ -234,11 +239,44 @@ spain_mod %>%
 
 ### 4.6. DHR Visual Forecasts
 ```{r}
-
+plot_nn(belgium_data_nn$train, belgium_nn_preds, "NN Forecasts: Belgium")
+plot_nn(italy_data_nn$train, italy_nn_preds, "NN Forecasts: Belgium")
+plot_nn(spain_data_nn$train, spain_nn_preds, "NN Forecasts: Belgium")
 ```
 
 ### 4.7. Model Comparison
 ```{r}
+# Belgium
+belgium_preds = list()
+belgium_preds[[1]] = belgium_dhr_preds
+belgium_preds[[2]] = belgium_nn_preds
 
+calc_metrics(
+  belgium_preds, 
+  belgium_data$test$TotalLoadValue, 
+  c("DHR", "NN")) %>%
+  arrange(MAPE)
+
+# Italy
+italy_preds = list()
+italy_preds[[1]] = italy_dhr_preds
+italy_preds[[2]] = italy_nn_preds
+
+calc_metrics(
+  italy_preds, 
+  italy_data$test$TotalLoadValue, 
+  c("DHR", "NN")) %>%
+  arrange(MAPE)
+
+# Spain
+spain_preds = list()
+spain_preds[[1]] = spain_dhr_preds
+spain_preds[[2]] = spain_nn_preds
+
+calc_metrics(
+  spain_preds, 
+  spain_data$test$TotalLoadValue, 
+  c("DHR", "NN")) %>%
+  arrange(MAPE)
 ```
 
