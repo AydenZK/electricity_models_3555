@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ## Imports
-```{r}
+```{r imports}
 library(dplyr)
 library(fpp3)
 library(glue)
@@ -15,7 +15,7 @@ library(Metrics)
 ```
 
 ## Globals
-```{r}
+```{r globals}
 TRAIN_START_DATE = "2014-12-01"
 TRAIN_END_DATE = "2019-10-19"
 TEST_START_DATE = "2019-10-18"
@@ -27,7 +27,7 @@ TEST_END_DATE = "2021-06-01"
 
 ### 1.1. DHR Data
 
-```{r}
+```{r dhr data}
 data = read.csv("../data/all_data_daily.csv") %>% 
     mutate(Date = as.Date(Date, "%Y-%m-%d")) %>% 
     filter(Country=="Austria") %>% 
@@ -47,14 +47,14 @@ forecast_days = nrow(test)
 
 ### 1.2. Load DHR Model
 
-```{r}
+```{r dhr models}
 load("../models/austria_dhr.rda") # dhr_mod loaded
 ```
 
 
 ### 1.3. Load DHR Predictions
 
-```{r}
+```{r dhr preds}
 dhr_preds <- dhr_mod %>% 
   forecast(h=forecast_days) %>% 
   as_tsibble(index=Date) %>%
@@ -64,7 +64,7 @@ dhr_preds <- dhr_mod %>%
 
 
 ### 1.4. Load NN Predictions
-```{r}
+```{r nn preds}
 nn_preds_raw <- read.csv("../models/predictions/raw_nn_preds.csv")
 
 nn_preds <- nn_preds_raw %>% 
@@ -91,7 +91,7 @@ l3_preds <- read.csv("../models/predictions/model_3layer.csv") %>%
 ## 2. Visual Forecasts
 
 ### 2.1. DHR Forecast
-```{r}
+```{r dhr fc}
 forecast(dhr_mod, h = forecast_days) %>% 
   autoplot(train) + labs(title="DHR Forecasts: Austria")
 ```
@@ -99,7 +99,7 @@ forecast(dhr_mod, h = forecast_days) %>%
 
 ### 2.2. NN Forecast
 
-```{r}
+```{r nn fc}
 plot_nn <- function(train, pred, title) {
   ggplot() + 
     geom_line(data=train, aes(x=Date, y=TotalLoadValue)) +
@@ -110,7 +110,7 @@ plot_nn <- function(train, pred, title) {
 plot_nn(train, nn_preds, "NN Forecasts: Austria") + ylim(0, 1.4e6)
 ```
 
-```{r}
+```{r nn fc2}
 plot_nn(train, l3_preds, "NN Forecasts: 3layer") + ylim(0, 1.4e6)
 plot_nn(train, l2_preds, "NN Forecasts: 2layer") + ylim(0, 1.4e6)
 ```
@@ -118,7 +118,7 @@ plot_nn(train, l2_preds, "NN Forecasts: 2layer") + ylim(0, 1.4e6)
 
 ### 2.3. Comparison
 
-```{r}
+```{r cmpare}
 cmap <- c("DHR" = "blue", "NN" = "red", "True" = "black")
 
 ggplot() + 
@@ -133,7 +133,7 @@ ggplot() +
 
 ## 3. Metrics Comparison
 
-```{r}
+```{r metrics}
 calc_metrics <- function(mod_preds, trues, labels) {
   rmses = c()
   maes = c()
@@ -175,7 +175,7 @@ calc_metrics(
 
 
 ### 4.1. Load DHR Models & Data
-```{r}
+```{r load dhr}
 source("../src/train_dhr.R")
 
 belgium_mod <- train_dhr_model(country="Belgium")
@@ -190,7 +190,7 @@ spain_data <- load_dhr_data(country="Spain")
 
 
 ### 4.2. Load NN Models & Data
-```{r}
+```{r load nn}
 source("../src/train_dnn.R")
 
 belgium_nn <- train_nn_model(country="Belgium")
@@ -204,35 +204,38 @@ italy_data_nn <- load_nn_data(country="Italy")
 ```
 
 ### 4.3. Generate DHR Predictions
-```{r}
+```{r dhr preds2}
 belgium_dhr_preds <- generate_dhr_preds_df(belgium_mod, forecast_days)
 italy_dhr_preds <- generate_dhr_preds_df(italy_mod, forecast_days)
 spain_dhr_preds <- generate_dhr_preds_df(spain_mod, forecast_days)
 ```
 
 ### 4.4. Generate NN Predictions
-```{r}
+```{r nn preds2}
 if (file.exists("../models/predictions/nn_Belgium.csv")) {
-  belgium_nn_preds <- read.csv("../models/predictions/nn_Belgium.csv")
+  belgium_nn_preds <- read.csv("../models/predictions/nn_Belgium.csv") %>% 
+    mutate(Date = as.Date(Date))
 } else {
   belgium_nn_preds <- generate_nn_preds_df(belgium_nn, belgium_data_nn, "Belgium")
 }
 
 if (file.exists("../models/predictions/nn_Italy.csv")) {
-  italy_nn_preds <- read.csv("../models/predictions/nn_Italy.csv")
+  italy_nn_preds <- read.csv("../models/predictions/nn_Italy.csv") %>% 
+    mutate(Date = as.Date(Date))
 } else {
-  italy_nn_preds <- generate_nn_preds_df(italy_nn, italy_data_nn, "Italy")
+  italy_nn_preds <- generate_nn_preds_df(italy_nn, italy_data_nn, "Italy") 
 }
 
 if (file.exists("../models/predictions/nn_Spain.csv")) {
-  spain_nn_preds <- read.csv("../models/predictions/nn_Spain.csv")
+  spain_nn_preds <- read.csv("../models/predictions/nn_Spain.csv") %>% 
+    mutate(Date = as.Date(Date))
 } else {
   spain_nn_preds <- generate_nn_preds_df(spain_nn, spain_data_nn, "Spain")
 }
 ```
 
 ### 4.5. DHR Visual Forecasts
-```{r}
+```{r dhr fc3}
 belgium_mod %>% 
   forecast(h=forecast_days) %>% 
   autoplot(belgium_data$train) + labs(title="DHR Forecast Belgium")
@@ -246,15 +249,15 @@ spain_mod %>%
   autoplot(spain_data$train) + labs(title="DHR Forecast Spain")
 ```
 
-### 4.6. DHR Visual Forecasts
-```{r}
+### 4.6. NN Visual Forecasts
+```{r nn fc3}
 plot_nn(belgium_data$train, belgium_nn_preds, "NN Forecasts: Belgium")
 plot_nn(italy_data$train, italy_nn_preds, "NN Forecasts: Belgium")
 plot_nn(spain_data$train, spain_nn_preds, "NN Forecasts: Belgium")
 ```
 
 ### 4.7. Model Comparison
-```{r}
+```{r Final Comparison}
 # Belgium
 belgium_preds = list()
 belgium_preds[[1]] = belgium_dhr_preds
