@@ -17,10 +17,6 @@ load_nn_data <- function(country) {
 
     raw = read.csv("../data/all_data_hourly.csv") %>% 
         filter(AreaName == country) %>% 
-        mutate(
-            Date = as.Date(DateTime),
-            dayofweek = ifelse(weekdays(Date) %in% c("Saturday", "Sunday"), 1, 0)
-        ) %>%
         select(Year, Date, Month, Day, Hours, dayofweek, TotalLoadValue)
 
     # Create unstandardised dataset
