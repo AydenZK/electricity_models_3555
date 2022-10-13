@@ -88,6 +88,23 @@ Stopping overfitting
 ### Performance metrics 
 - MAPE, RMSE, SSE, R
 
+```{r, hyperparameter tuning for lstm}
+library(keras)
+library(tensorflow)
+library(tfruns)
+runs_2 <- tuning_run("nn_exp.R",
+                   flags = list(
+                     batch_size = c(32),
+                     learning_rate = c(0.01, 0.001, 0.0001),
+                     lstm_units = c(32, 64),
+                     dense_units1 = c(64, 128),
+                     dense_units2 = c(32, 64)
+                     )
+                   )
+
+```
+
+
 ```{r, hyperparameter tuning}
 library(keras)
 library(tensorflow)
