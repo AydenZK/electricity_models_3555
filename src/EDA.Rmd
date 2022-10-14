@@ -1,0 +1,47 @@
+---
+title: "EDA and Data checks"
+author: "Ryan Hendler"
+date: "14/10/2022"
+output: html_document
+---
+
+```{r}
+data <- read_csv("../data/all_data_hourly_eda.csv")
+```
+
+
+
+```{r, EDA}
+# Between countries
+#ggplot(data=data, aes(x=reorder(AreaName,TotalLoadValue),y=mean(TotalLoadValue))) + geom_bar(stat='identity', aes(fill=mean(TotalLoadValue))) + coord_flip() + x_lab("Total ")
+
+
+# Yearly plots
+eda_data_year <- data %>% filter(AreaName %in% c('Austria', 'Germany', 'Belgium'))
+eda_data_year %>% ggplot(aes(x=Date, y=TotalLoadValue, colour = AreaName)) + geom_line() + facet_wrap(~AreaName) + xlab("Date") + ylab("Total Electricity Demand") + ggtitle("Comparing the electricity demand between different countries")
+eda_data_year %>% filter(Year %in% c(2015,2016,2017,2018,2019)) %>% group_by(Year, AreaName) %>% summarise(TotalLoadValue = sum(TotalLoadValue)) %>% ggplot(aes(x=Year, y=TotalLoadValue, colour = AreaName)) + geom_point() + facet_wrap(~AreaName) + xlab("Year") + ylab("Total Electricity Demand") + ggtitle("Electricity demand by year")
+
+# Monthly plots
+eda_data_month <- data %>% filter(AreaName %in% c('Austria', 'Germany', 'Belgium'), Year %in% c(2017,2018,2019,2020))
+eda_data_month %>% group_by(Year, Month, AreaName) %>% summarise(TotalLoadValue = sum(TotalLoadValue)) %>% ggplot(aes(x=Month, y=TotalLoadValue, colour = AreaName)) + geom_point() + facet_wrap(~Year) + xlab("Month") + ylab("Total Electricity Demand") + ggtitle("Electricity demand by month and year")
+
+# Weekly plots
+eda_data_week <- data %>% filter(AreaName %in% c('Austria', 'Germany', 'Belgium'), Year %in% c(2017,2018,2019,2020))
+eda_data_week %>% group_by(dayofweek, AreaName) %>% summarise(TotalLoadValue = sum(TotalLoadValue)) 
+
+# Daily plots
+eda_data_day <- data %>% group_by(Year, Month, Day, AreaName, Hours) %>% summarise(TotalLoadValue = sum(TotalLoadValue))
+eda_data_day %>% filter(Month == 5, Year == 2019, Day %in% c(5,10,15)) %>% ggplot(aes(x=Hours, y=TotalLoadValue, colour = AreaName)) + geom_line() + facet_wrap(~Day)
+
+# Hourly plots - Hours shouldn be used and period/resolution code
+#eda_data_hours <- data %>% group_by(AreaName, Minutes) %>% summarise(TotalLoadValue = sum(TotalLoadValue))
+#eda_data_hours %>% filter(Month == 5, Year == 2019, Day %in% c(5,10,15)) %>% ggplot(aes(x=Hours, y=TotalLoadValue, colour = AreaName)) + geom_point() + facet_wrap(~Day)
+
+# Data checks
+# Check for NA's
+colSums(is.na(data))
+
+# Summary for all columns
+sapply(data, summary)
+```
+

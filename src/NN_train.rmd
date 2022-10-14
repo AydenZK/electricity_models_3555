@@ -1,0 +1,290 @@
+---
+title: "Project"
+output: html_document
+date: "2022-10-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, Data Ingestion and Cleaning}
+library(tidyverse)
+library(readxl)
+library(fpp3)
+library(readabs)
+library(tidyverse)
+library(tidyr)
+library(fpp3)
+library(keras)
+library(tensorflow)
+library(caret)
+```
+
+```{r, warning=FALSE}
+data <- read_csv("../data/all_data_hourly_eda.csv") %>% filter(AreaName == "Austria")
+```
+
+```{r, NN}
+data <- data %>% select(Year, Month, Day, Hours, dayofweek, TotalLoadValue)
+
+# Create unstandardised dataset
+lagged_data_usd <- data %>% mutate("hour-1" = lag(TotalLoadValue, n=1), "hour-2" = lag(TotalLoadValue, n=2) ,"day-1" = lag(TotalLoadValue, n=24), "day-7" = lag(TotalLoadValue, n=168)) %>% select(Year, Month, Day, Hours, dayofweek, TotalLoadValue, `day-1`, `day-7`, `hour-1`, `hour-2`) %>% tail(-168)
+
+# Create standardised dataset
+lagged_data_sd <- data %>% mutate("hour-1" = lag(TotalLoadValue, n=1), "hour-2" = lag(TotalLoadValue, n=2) ,"day-1" = lag(TotalLoadValue, n=24), "day-7" = lag(TotalLoadValue, n=168)) %>% select(Year, Month, Day, Hours, dayofweek, TotalLoadValue, `day-1`, `day-7`, `hour-1`, `hour-2`) %>% mutate(`day-1`= sqrt(`day-1`), `day-7`= sqrt(`day-7`), `hour-1`= sqrt(`hour-1`), `hour-2`= sqrt(`hour-2`)) %>% tail(-168)
+
+
+#mutate(`day-1`= scale(`day-1`, center=TRUE, scale=TRUE), `day-7`= scale(`day-7`, center=TRUE, scale=TRUE), `hour-1`= scale(`hour-1`, center=TRUE, scale=TRUE), `hour-2`= scale(`hour-2`, center=TRUE, scale=TRUE)) %>% tail(-168)
+#lagged_data <- data %>% select(Year, Month, Day, Hours, dayofweek, TotalLoadValue)
+
+# Sin/cosine transform the time variables
+lagged_data_sd$Hours_sin = sin(2*pi*lagged_data_sd$Hours/24)
+lagged_data_sd$Hours_cos = cos(2*pi*lagged_data_sd$Hours/24)
+lagged_data_sd$Month_sin = cos(2*pi*lagged_data_sd$Month/12)
+lagged_data_sd$Month_cos = cos(2*pi*lagged_data_sd$Month/12)
+lagged_data_sd$Day_sin = cos(2*pi*lagged_data_sd$Day/31)
+lagged_data_sd$Day_cos = cos(2*pi*lagged_data_sd$Day/31)
+
+
+lagged_data_usd$Hours_sin = sin(2*pi*lagged_data_usd$Hours/24)
+lagged_data_usd$Hours_cos = cos(2*pi*lagged_data_usd$Hours/24)
+lagged_data_usd$Month_sin = cos(2*pi*lagged_data_usd$Month/12)
+lagged_data_usd$Month_cos = cos(2*pi*lagged_data_usd$Month/12)
+lagged_data_usd$Day_sin = cos(2*pi*lagged_data_usd$Day/31)
+lagged_data_usd$Day_cos = cos(2*pi*lagged_data_usd$Day/31)
+
+# Remove outliers
+lagged_data_sd <- lagged_data_sd[!lagged_data_sd$TotalLoadValue %in% boxplot.stats(lagged_data_sd$TotalLoadValue)$out,]
+lagged_data_usd <- lagged_data_usd[!lagged_data_usd$TotalLoadValue %in% boxplot.stats(lagged_data_usd$TotalLoadValue)$out,]
+
+# Train/Test split
+#find_row_number <- lagged_data_sd %>% mutate(rownum <- row_number()) %>% filter(Year == 2019, Month == 10, Day == 19)
+train <- lagged_data_sd[1:42380,] 
+test <- lagged_data_sd[42381:nrow(lagged_data_sd),]
+
+X_train = train %>% select(-Year, -TotalLoadValue, -Hours, -Day, -Month)
+y_train = train %>% select(TotalLoadValue)
+
+X_test = test %>% select(-Year, -TotalLoadValue, -Hours, -Day, -Month)
+y_test = test %>% select(TotalLoadValue)
+
+
+#For predicting and comparing to test set after
+test_pred <- lagged_data_usd[42381:nrow(lagged_data_usd),] %>% mutate(`day-1`= sqrt(`day-1`), `day-7`= sqrt(`day-7`), `hour-1`= sqrt(`hour-1`), `hour-2`= sqrt(`hour-2`))
+
+X_test_pred <- test_pred %>% select(-Year, -TotalLoadValue, -Hours, -Day, -Month)
+Y_test_pred = test %>% select(TotalLoadValue) %>% mutate(TotalLoadValue = sqrt(TotalLoadValue))
+```
+
+### Hyperparameters
+Training:
+- Starting learning rate, Learning rate scheduler
+- Dense layer units
+- Drop out rate
+- Number of layers (dense, dropout)
+- Batch size
+
+- Weight decay/Momentum
+- Loss function swapping
+- Optimiser (ADAM, SGD, RMSProp)
+
+Stopping overfitting
+- Early stopping 
+
+### Performance metrics 
+- MAPE, RMSE, SSE, R
+
+
+```{r, hyperparameter tuning 3 layers}
+# For 3 layers
+library(keras)
+library(tensorflow)
+library(tfruns)
+runs <- tuning_run("nn_exp.R",
+                   flags = list(
+                     dense_units1 = c(32, 64, 128),
+                     dense_units2 = c(32, 64, 128),
+                     dense_units3 = c(32, 64, 128),
+                     #dropout1 = c(0, 0.2),
+                     #dropout2 = c(0, 0.2),
+                     #dropout3 = c(0, 0.2),
+                     batch_size = c(16, 32, 64),
+                     learning_rate = c(0.1, 0.01, 0.001, 0.0001)
+                     )
+                   )
+
+head(runs)
+```
+
+
+```{r, hyperparameter tuning 2 layers}
+# For 3 layers
+library(keras)
+library(tensorflow)
+library(tfruns)
+runs <- tuning_run("nn_exp.R",
+                   flags = list(
+                     dense_units1 = c(32, 64, 128),
+                     dense_units2 = c(32, 64, 128),
+                     #dropout1 = c(0, 0.2),
+                     #dropout2 = c(0, 0.2),
+                     batch_size = c(16, 32, 64),
+                     learning_rate = c(0.1, 0.01, 0.001, 0.0001)
+                     )
+                   )
+
+head(runs)
+```
+
+```{r, hyperparameter tuning for lstm}
+#library(keras)
+#library(tensorflow)
+#library(tfruns)
+#runs_2 <- tuning_run("nn_exp.R",
+#                   flags = list(
+#                     batch_size = c(32),
+#                     learning_rate = c(0.01, 0.001, 0.0001),
+#                     lstm_units = c(32, 64),
+#                     dense_units1 = c(64, 128),
+#                     dense_units2 = c(32, 64)
+#                     )
+#                   )
+
+```
+
+
+
+```{r}
+library(keras)
+library(tensorflow)
+library(tfruns)
+set.seed(2022)
+model1 <- keras_model_sequential() %>%
+  layer_dense(128, activation = "relu") %>%
+  layer_dense(128, activation = "relu") %>%
+  layer_dense(64, activation = "relu") %>%
+  layer_dense(1, activation = "linear")
+
+# Compile w/ optimiser and loss
+model1 %>% compile(optimizer = optimizer_adam(learning_rate = 0.005), loss = 'mean_absolute_error', metrics=c("mape"))
+
+# Early stopping
+early_stopping <- callback_early_stopping(monitor="loss", min_delta = 10, patience=5, mode="min")
+
+# Fit 
+set.seed(2022)
+history1 <- model1 %>% 
+  fit(
+    x = as.matrix(X_train), 
+    y = as.matrix(y_train), 
+    validation_split = 0.2, 
+    batch_size = 32,
+    epochs = 33,
+    callbacks = list(early_stopping)
+  )
+
+plot(history1)
+```
+
+
+```{r, try lstm}
+#model2 <- keras_model_sequential() %>%
+#  layer_lstm(units = 64) %>%
+#  layer_dense(units = 64, activation="relu") %>%
+#  layer_dropout(0.3) %>%
+#  layer_dense(units = 64, activation="relu") %>%
+#  layer_dropout(0.3) %>%
+#  layer_dense(1, activation="linear")
+
+#model2 <- model2 %>% compile(optimizer = optimizer_adam(), loss = 'mean_absolute_error')
+
+#history2 <- model2 %>% fit(as.matrix(X_train), as.matrix(y_train), validation_split = 0.2, epochs = 15)
+#plot(history2)
+```
+
+
+```{r, try rnn}
+#model3 <- keras_model_sequential() %>%
+ # layer_simple_rnn(units = 32) %>%
+  ##layer_dense(units = 64, activation="relu") %>%
+  #layer_dense(units = 64, activation="relu") %>%
+  #layer_dense(1, activation="linear")
+
+#model3 <- model3 %>% compile(optimizer = optimizer_adam(), loss = 'mean_absolute_error')
+
+
+#history3 <- model3 %>% fit(as.matrix(X_train), as.matrix(y_train), validation_split = 0.2, epochs = 15)
+##plot(history3)
+```
+
+
+```{r, test_eval}
+model1 %>% evaluate(as.matrix(X_test),as.matrix(y_test))
+```
+
+```{r}
+train_graph <- train %>% mutate(rownumber = row_number())
+y <- predict(model1, as.matrix(X_train))
+x <- seq(1, nrow(y), length.out = nrow(y))
+
+ggplot(train) + geom_line(aes(x=x, y = TotalLoadValue, colour = "data"), size = 0.1) + geom_line(data = data.frame(train_graph$rownumber,y), aes(x=train_graph$rownumber, y=y, colour="prediction"), size = 0.1)
+
+
+train_actual_graph <- train[1:1000,]
+train_graph <- train_graph[1:1000,]
+y <- y[1:1000,]
+x <- seq(1, 1000, length.out = 1000)
+
+ggplot(train_actual_graph) + geom_line(aes(x=x, y = TotalLoadValue, colour = "data")) + geom_line(data = data.frame(train_graph$rownumber,y), aes(x=train_graph$rownumber, y=y, colour="prediction"))
+
+```
+
+```{r}
+#append date
+predictions <- data.frame(rownumber = numeric(0), prediction = numeric(0))
+for (i in 1:nrow(X_test_pred)) {
+  if (i == 1) {
+    prediction_i <- sqrt(predict(model1, as.matrix(X_test_pred[i,])))
+    predictions[i,] <- c(i, prediction_i)
+  }
+  
+  else if (i > 1 & i < 25) {
+    X_test_pred$`hour-1`[i] = prediction_i
+    X_test_pred$`hour-2`[i] = X_test_pred$`hour-1`[i-1]
+    prediction_i <- sqrt(predict(model1, as.matrix(X_test_pred[i,])))
+    predictions[i,] <- c(i, prediction_i)
+  }
+  
+  else if (i > 24 & i < 169) {
+    X_test_pred$`hour-1`[i] = prediction_i
+    X_test_pred$`hour-2`[i] = X_test_pred$`hour-1`[i-1]
+    X_test_pred$`day-1`[i] = predictions[i-24,2]
+    prediction_i <- sqrt(predict(model1, as.matrix(X_test_pred[i,])))
+    predictions[i,] <- c(i, prediction_i)
+  }
+  else {
+    X_test_pred$`hour-1`[i] = prediction_i
+    X_test_pred$`hour-2`[i] = X_test_pred$`hour-1`[i-1]
+    X_test_pred$`day-1`[i] = predictions[i-24,2]
+    X_test_pred$`day-7`[i] = predictions[i-168,2]
+    prediction_i <- sqrt(predict(model1, as.matrix(X_test_pred[i,])))
+    predictions[i,] <- c(i, prediction_i)
+  }
+}
+
+Y_test_pred
+
+
+final_predictions <- predictions %>% mutate(TotalLoadValue = prediction^2) 
+x <- seq(1, nrow(predictions), length.out = nrow(predictions))
+ggplot(Y_test_pred) + geom_line(aes(x=x, y = TotalLoadValue, colour = "data")) + geom_line(data = final_predictions, aes(x=rownumber, y=TotalLoadValue, colour="prediction"))
+
+final <- test
+final$TotalLoadValuePred = final_predictions$TotalLoadValue
+
+
+final <- final %>% group_by(Year, Month, Day) %>% summarise(TotalLoadValue = sum(TotalLoadValuePred))
+
+write.csv(final, "../models/predictions/raw_nn_preds.csv")
+```

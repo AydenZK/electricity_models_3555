@@ -17,15 +17,11 @@ A group assignment as part of the Monash 2022 Unit ETC3555, involving the develo
 
 - Run `Rscript transform_raw.R`
 
-## 2. EDA and Data Checks
+## 2. Training Deep Neural Network Model & Hyperparamaeter Tuning
+- Open and run `src/FinalProject.Rmd`
 
-- Open and run `src/EDA.rmd`
-
-## 3. Training Deep Neural Network Model & Hyperparamaeter Tuning
-- Open and run `src/NN_train.Rmd`
-
-## 4. Benchmark Model Creation and Analysis
+## 3. Benchmark Model Creation and Analysis
 - Open and run `analysis/dhr_analysis.Rmd`
 
-## 5. Model Evaluation & Comparison
+## 4. Model Evaluation & Comparison
 - Open and run `analysis/model_eval.Rmd`
